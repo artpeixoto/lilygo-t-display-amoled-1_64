@@ -710,6 +710,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "lilygo-t-display-amoled-1_64"
+version = "0.1.0"
+dependencies = [
+ "embedded-graphics",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "embedded-hal-bus",
+ "embedded-io",
+ "embedded-io-async",
+ "esp-backtrace",
+ "esp-hal",
+ "esp-println",
+ "fixed",
+ "ft3168",
+ "fugit",
+ "icna3311",
+ "nalgebra",
+ "pipe",
+]
+
+[[package]]
 name = "litrs"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1084,27 +1105,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "t-display-s3-1_64-driver"
-version = "0.1.0"
-dependencies = [
- "embedded-graphics",
- "embedded-hal 1.0.0",
- "embedded-hal-async",
- "embedded-hal-bus",
- "embedded-io",
- "embedded-io-async",
- "esp-backtrace",
- "esp-hal",
- "esp-println",
- "fixed",
- "ft3168",
- "fugit",
- "icna3311",
- "nalgebra",
- "pipe",
 ]
 
 [[package]]

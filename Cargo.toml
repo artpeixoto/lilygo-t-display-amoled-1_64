@@ -1,5 +1,5 @@
 [package]
-name = "t-display-s3-1_64-driver"
+name = "lilygo-t-display-amoled-1_64"
 version = "0.1.0"
 authors = ["artur.peixoto <arturokfya@gmail.com>"]
 edition = "2021"
