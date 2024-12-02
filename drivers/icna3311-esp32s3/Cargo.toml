@@ -1,0 +1,15 @@
+[package]
+name = "icna3311-esp32s3"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+embedded-graphics = "0.8.1"
+embedded-hal = "1.0.0"
+embedded-hal-async = "1.0.0"
+embedded-hal-bus = "0.2.0"
+embedded-io = "0.6.1"
+embedded-io-async = "0.6.1"
+esp-hal = { version = "0.22.0", features = ["esp32s3"] }
+# esp-hal-common = "0.15.0"
+icna3311 = { version = "0.1.0", path = "../icna3311" }

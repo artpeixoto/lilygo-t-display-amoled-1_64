@@ -1,0 +1,39 @@
+[package]
+name = "t-display-s3-1_64-driver"
+version = "0.1.0"
+authors = ["artur.peixoto <arturokfya@gmail.com>"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+embedded-graphics = "0.8.1"
+embedded-hal = "1.0.0"
+embedded-hal-async = "1.0.0"
+embedded-io = "0.6.1"
+embedded-io-async = "0.6.1"
+
+icna3311 = {path = "drivers/icna3311"}
+ft3168   = {path = "drivers/ft3168"}
+fixed = "1.28.0"
+nalgebra = { version = "0.33.2", default-features = false }
+pipe = { git = "https://github.com/artpeixoto/pipe", rev = "f0178a7e"}
+esp-hal = { version = "0.22.0", features = ["esp32s3"] }
+esp-backtrace = {version = "0.14.2", features = ["esp32s3", "println"]}
+esp-println = {version = "0.12.0", features = ["esp32s3"]}
+fugit = "0.3.7"
+embedded-hal-bus = "0.2.0"
+# log = { version = "0.4.22" }
+
+# [profile.dev]
+# # Rust debug is too slow.
+# # For debug builds always builds with some optimization
+# opt-level = "s"
+
+# [profile.release]
+# codegen-units = 1 # LLVM can perform better optimizations using a single thread
+# debug = 2
+# debug-assertions = false
+# incremental = false
+# lto = 'fat'
+# opt-level = 's'
+# overflow-checks = false
