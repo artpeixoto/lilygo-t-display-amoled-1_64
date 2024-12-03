@@ -1,5 +1,5 @@
 [package]
-name = "lilygo-t-display-amoled-1_64"
+name = "lilygo-t-display-s3-amoled-1_64"
 version = "0.1.0"
 authors = ["artur.peixoto <arturokfya@gmail.com>"]
 edition = "2021"
@@ -25,16 +25,16 @@ embedded-hal-bus = "0.2.0"
 ufmt = "0.2.0"
 # log = { version = "0.4.22" }
 
-# [profile.dev]
-# # Rust debug is too slow.
-# # For debug builds always builds with some optimization
-# opt-level = "s"
+[profile.dev]
+# Rust debug is too slow.
+# For debug builds always builds with some optimization
+opt-level = "s"
 
-# [profile.release]
-# codegen-units = 1 # LLVM can perform better optimizations using a single thread
-# debug = 2
-# debug-assertions = false
-# incremental = false
-# lto = 'fat'
-# opt-level = 's'
-# overflow-checks = false
+[profile.release]
+codegen-units = 1 # LLVM can perform better optimizations using a single thread
+debug = 2
+debug-assertions = false
+incremental = false
+lto = 'fat'
+opt-level = 's'
+overflow-checks = false

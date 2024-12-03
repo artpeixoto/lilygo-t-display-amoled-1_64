@@ -710,7 +710,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "lilygo-t-display-amoled-1_64"
+name = "lilygo-t-display-s3-amoled-1_64"
 version = "0.1.0"
 dependencies = [
  "embedded-graphics",
