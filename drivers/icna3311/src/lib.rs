@@ -9,18 +9,20 @@ use embedded_graphics::{
     primitives::Rectangle,
     Pixel,
 };
+
 use embedded_hal::{
     digital::OutputPin,
     spi::{Operation, SpiDevice, MODE_0},
 };
+
 use fixed::types::U0F8;
 
 pub struct Icna3311<Spi, EnPin, RstPin, PixColor> {
-    spi: Spi,
-    en_pin: EnPin,
-    rst_pin: RstPin,
-    mode: HalfDuplexSpiMode,
-    color: PhantomData<PixColor>,
+    spi     : Spi,
+    en_pin  : EnPin,
+    rst_pin : RstPin,
+    mode    : HalfDuplexSpiMode,
+    color   : PhantomData<PixColor>,
 }
 
 pub const WIDTH: usize = 280;

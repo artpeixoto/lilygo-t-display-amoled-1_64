@@ -40,11 +40,18 @@ fn main() -> ! {
 	println!("initializing peripherals");
     let delay = Delay::new();
 	println!("initializing spi basic");
-    let spi = Spi::new(peripherals.SPI3)
+
+    let mut spi = 
+		Spi::new(peripherals.SPI3)
         .with_mosi(Flex::new(peripherals.GPIO11))
         .with_miso(Flex::new(peripherals.GPIO13))
-        .with_sck(Output::new(peripherals.GPIO12, Level::Low));
-
+        .with_sck(Output::new(peripherals.GPIO12, Level::Low))
+		;
+	spi.apply_config(&SpiConfig{
+			frequency: HertzU32::Hz(240_000),
+			..Default::default()
+		})
+		.unwrap();
     let spi_cs = Output::new(peripherals.GPIO10, Level::High);
 
 	println!("initializing modal spi");
@@ -56,13 +63,15 @@ fn main() -> ! {
 	println!("initializing display");
     let mut display = 
 		Icna3311::new(spi, en_pin, rst_pin)
-        .with_spi_mode(HalfDuplexSpiMode::Quad, |x| ModalHalfDuplexEspSpi {
-            spi: x
-                .spi
-                .with_sio2(Flex::new(peripherals.GPIO14))
-                .with_sio3(Flex::new(peripherals.GPIO15)),
-            ..x
-        })
+        // .with_spi_mode(
+		// 	HalfDuplexSpiMode::Quad, 
+		// 	|x| ModalHalfDuplexEspSpi {
+		// 		spi: x.spi
+		// 			.with_sio2(Flex::new(peripherals.GPIO14))
+		// 			.with_sio3(Flex::new(peripherals.GPIO15)),
+		// 		..x
+		// 	}
+		// )
         .with_pixel_format::<Rgb888>()
         .map_err(|e| panic!())
         .unwrap();
@@ -70,6 +79,8 @@ fn main() -> ! {
     display.enable();
 	display.wake_from_sleep().unwrap();
 	Delay::new().delay_millis(5);
+
+	display.set_display_on(true);
 	display.set_brightness(U0F8::from_num(0.6)).unwrap();
     display.fill_solid(&display.bounding_box(), RgbColor::WHITE).map_err(|e| panic!("error ")).unwrap();
 
@@ -83,6 +94,7 @@ fn main() -> ! {
 		)
 		.with_sda(Flex::new(peripherals.GPIO7))
 		.with_scl(Flex::new(peripherals.GPIO6));
+
 	let touch_int_pin = Input::new(peripherals.GPIO9, Pull::Up);
 	// let touch_rst_pin = Output::new(peripherals.GPIO8, Level::Low);
 
