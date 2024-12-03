@@ -1,7 +1,7 @@
 #![no_std]
 
 use core::{
-    fmt::Display, iter, marker::{Copy, PhantomData}
+    fmt::Display, iter::{self, empty}, marker::{Copy, PhantomData}
 };
 use embedded_graphics::{
     pixelcolor::{Gray8, Rgb666, Rgb888},
@@ -26,6 +26,7 @@ pub struct Icna3311<Spi, EnPin, RstPin, PixColor> {
 pub const WIDTH: usize = 280;
 pub const HEIGHT: usize = 456;
 
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum DisplayError<SpiErr> {
     OutOfBoundsError,
     SpiError(SpiErr),
@@ -117,13 +118,15 @@ where
     RstPin: OutputPin,
 {
     pub fn new(spi: Spi, en_pin: EnPin, rst_pin: RstPin) -> Self {
-        Self {
+        let mut res = Self {
             spi,
             en_pin,
             rst_pin,
             mode: HalfDuplexSpiMode::Simple,
             color: PhantomData,
-        }
+        };
+        res.enable();
+        res
     }
 }
 
@@ -139,6 +142,7 @@ where
         spi_mode: HalfDuplexSpiMode,
         spi_modifier: impl FnOnce(Spi) -> NewSpi,
     ) -> Icna3311<NewSpi, EnPin, RstPin, PixColor> {
+
         let enter_mode_cmd = match &spi_mode {
             &HalfDuplexSpiMode::Simple => 0xff,
             &HalfDuplexSpiMode::Dual => 0x3b,
@@ -158,6 +162,10 @@ where
             rst_pin: self.rst_pin,
             mode: spi_mode,
         }
+    }
+    pub fn wake_from_sleep(&mut self)-> Result<(), DisplayError<Spi::Error>>{
+        self.cmd(0x11, iter::empty())?;
+        Ok(())
     }
     pub fn enable(&mut self) {
         self.en_pin.set_high().unwrap();

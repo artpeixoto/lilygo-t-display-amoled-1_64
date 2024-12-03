@@ -198,9 +198,9 @@ pub enum TouchEvent{
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Touch {
-	id: TouchId,
-	pos		: TouchPos,
-	area	: TouchArea,
-	weight  : TouchWeight,
-	event	: TouchEvent,
+	pub id		: TouchId,
+	pub pos		: TouchPos,
+	pub area	: TouchArea,
+	pub weight  : TouchWeight,
+	pub event	: TouchEvent,
 }
