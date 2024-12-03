@@ -30,7 +30,7 @@ fn main() -> ! {
     #[allow(unused)]
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let delay = Delay::new();
-
+	loop{}
     let spi = Spi::new(peripherals.SPI2)
         .with_mosi(Flex::new(peripherals.GPIO11))
         .with_miso(Flex::new(peripherals.GPIO13))
@@ -111,6 +111,7 @@ fn main() -> ! {
 		.map_err(|e| panic!("Error writing text"))
 		.unwrap();
 
+	loop{}
     loop {
 		if let Ok(Some( touches )) = touch_sensor.get_touches(){
 			Text::new(
