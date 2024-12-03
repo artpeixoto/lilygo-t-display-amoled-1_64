@@ -1,8 +1,7 @@
 #![no_std]
 
 use core::{
-    fmt::Display,
-    marker::{Copy, PhantomData},
+    fmt::Display, iter, marker::{Copy, PhantomData}
 };
 use embedded_graphics::{
     pixelcolor::{Gray8, Rgb666, Rgb888},
@@ -53,19 +52,19 @@ pub enum Dir {
     Decreasing,
 }
 pub trait Icna3311PixelColor: PixelColor {
-    const COLOR_FORMAT: Icna3311ColorFormat;
+    const PIXEL_FORMAT: Icna3311ColorFormat;
     fn as_bytes(iter: impl Iterator<Item = Self>) -> impl Iterator<Item = u8>;
 }
 
 impl Icna3311PixelColor for Rgb888 {
-    const COLOR_FORMAT: Icna3311ColorFormat = Icna3311ColorFormat::Rgb888;
+    const PIXEL_FORMAT: Icna3311ColorFormat = Icna3311ColorFormat::Rgb888;
 
     fn as_bytes(iter: impl Iterator<Item = Self>) -> impl Iterator<Item = u8> {
         iter.flat_map(|c| [c.r(), c.g(), c.b()])
     }
 }
 impl Icna3311PixelColor for Rgb666 {
-    const COLOR_FORMAT: Icna3311ColorFormat = Icna3311ColorFormat::Rgb666;
+    const PIXEL_FORMAT: Icna3311ColorFormat = Icna3311ColorFormat::Rgb666;
 
     fn as_bytes(iter: impl Iterator<Item = Self>) -> impl Iterator<Item = u8> {
         iter.flat_map(|c| [c.r(), c.g(), c.b()])
@@ -80,7 +79,7 @@ impl Icna3311PixelColor for Rgb666 {
 // 	}
 // }
 impl Icna3311PixelColor for Gray8 {
-    const COLOR_FORMAT: Icna3311ColorFormat = Icna3311ColorFormat::Gray8;
+    const PIXEL_FORMAT: Icna3311ColorFormat = Icna3311ColorFormat::Gray8;
 
     fn as_bytes(iter: impl Iterator<Item = Self>) -> impl Iterator<Item = u8> {
         iter.map(|c| c.luma())
@@ -97,22 +96,23 @@ pub enum HalfDuplexSpiMode {
 pub trait ErrorType {
     type Error;
 }
-pub trait ModalHalfDuplexSpiDeviceTransaction<Word, Error>{
-    fn write(&mut self  , buf: &[Word]      , mode: HalfDuplexSpiMode) -> Result<(), Error>; 
-    fn read(&mut self   , buf: &mut [Word]  , mode: HalfDuplexSpiMode) -> Result<(), Error>;
+
+pub trait ModalHalfDuplexSpiDeviceTransaction<Word = u8>{
+    type Error;
+    fn write(&mut self  , buf: &[Word]      , mode: HalfDuplexSpiMode) -> Result<(), Self::Error>; 
+    fn read(&mut self   , buf: &mut [Word]  , mode: HalfDuplexSpiMode) -> Result<(), Self::Error>;
 }
 
-pub trait HalfDuplexSpiDevice<Word=u8>: ErrorType
+pub trait ModalHalfDuplexSpiDevice<Word=u8>: ErrorType
 where
     Word: Copy + 'static,
 {
-    type Transaction<'a>: ModalHalfDuplexSpiDeviceTransaction<Word, Self::Error> + 'a where Self: 'a;
+    type Transaction<'a>: ModalHalfDuplexSpiDeviceTransaction<Word, Error=<Self as ErrorType>::Error> + 'a where Self: 'a;
     fn start_transaction<'a>(&'a mut self) -> Result<Self::Transaction<'a>, Self::Error>;
 }
-
-impl<Spi, EnPin, RstPin, PixColor> Icna3311<Spi, EnPin, RstPin, PixColor>
+impl<Spi, EnPin, RstPin> Icna3311<Spi, EnPin, RstPin, ()>
 where
-    Spi: HalfDuplexSpiDevice<u8>, //SpiDevice<u1> ?
+    Spi: ModalHalfDuplexSpiDevice<u8>, //SpiDevice<u1> ?
     EnPin: OutputPin,
     RstPin: OutputPin,
 {
@@ -125,7 +125,16 @@ where
             color: PhantomData,
         }
     }
-    pub fn change_spi_mode<NewSpi: SpiDevice<u8>>(
+}
+
+impl<Spi, EnPin, RstPin, PixColor> Icna3311<Spi, EnPin, RstPin, PixColor>
+where
+    Spi     : ModalHalfDuplexSpiDevice<u8>, //SpiDevice<u1> ?
+    EnPin   : OutputPin,
+    RstPin  : OutputPin,
+{
+
+    pub fn with_spi_mode<NewSpi: ModalHalfDuplexSpiDevice<u8>>(
         mut self,
         spi_mode: HalfDuplexSpiMode,
         spi_modifier: impl FnOnce(Spi) -> NewSpi,
@@ -136,7 +145,7 @@ where
             &HalfDuplexSpiMode::Quad => 0x38,
         };
 
-        self.cmd(enter_mode_cmd, &[])
+        self.cmd(enter_mode_cmd, iter::empty())
             .map_err(|_| panic!("Something bad happened when trying to change spi mode"))
             .unwrap();
 
@@ -169,17 +178,17 @@ where
         &mut self,
         addr: u8,
     ) -> Result<[u8; LEN], DisplayError<Spi::Error>> {
-        let transaction = self.spi.start_transaction();
+
+        let mut transaction = self.spi.start_transaction().map_err(DisplayError::SpiError)?;
+
         let cmd_data = [0x03, 0x00, addr, 0x00];
-        
+
+        transaction.write(&cmd_data, self.mode).map_err(DisplayError::SpiError)?;
+
         let mut res_buf = [0_u8; LEN];
-        let mut transactions = [
-            (Operation::Write(&cmd_data), self.mode),
-            (Operation::Read(&mut res_buf), self.mode),
-        ];
-        self.spi
-            .transaction_with_mode(&mut transactions)
-            .map_err(DisplayError::SpiError)?;
+
+        transaction.read(&mut res_buf, self.mode).map_err(DisplayError::SpiError)?;
+
         Ok(res_buf)
     }
 
@@ -219,12 +228,13 @@ where
             }
             [parm_data]
         };
-        self.cmd(0x36, &parm_data)
+        self.cmd(0x36, parm_data.into_iter())
     }
-    pub fn set_pixel_format(
-        &mut self,
-        pixel_format: Icna3311ColorFormat,
-    ) -> Result<(), DisplayError<Spi::Error>> {
+    pub fn with_pixel_format<NewPixColor: Icna3311PixelColor>(
+        mut self,
+    ) -> Result<Icna3311<Spi, EnPin, RstPin, NewPixColor>, DisplayError<Spi::Error>> 
+    {
+        let pixel_format = NewPixColor::PIXEL_FORMAT ;
         let parm = {
             let ifpf: u8 = match pixel_format {
                 Icna3311ColorFormat::Gray8 => 0b001,
@@ -236,22 +246,28 @@ where
             };
             [0b0000_0_000 | ifpf]
         };
-        self.cmd(0x3a, &parm)?;
-        Ok(())
+        self.cmd(0x3a, parm.into_iter())?;
+        Ok(Icna3311{
+            spi: self.spi,
+            en_pin: self.en_pin,
+            rst_pin: self.rst_pin,
+            mode: self.mode,
+            color: PhantomData
+        })
     }
 
     pub fn set_display_on(&mut self, set_on: bool) -> Result<(), DisplayError<Spi::Error>> {
         if set_on {
-            self.cmd(0x29, &[])?;
+            self.cmd(0x29, iter::empty())?;
         } else {
-            self.cmd(0x28, &[])?;
+            self.cmd(0x28, iter::empty())?;
         }
         Ok(())
     }
 
     pub fn set_brightness(&mut self, brightness: U0F8) -> Result<(), DisplayError<Spi::Error>> {
         let brightness_byte = brightness.to_be_bytes();
-        self.cmd(0x51, &brightness_byte)?;
+        self.cmd(0x51, brightness_byte.into_iter())?;
         Ok(())
     }
 
@@ -278,18 +294,16 @@ where
             // set col addresses (CASET)
             let col_addresses_bits =
                 get_coords_bytes(rect.top_left.x, rect.bottom_right().unwrap().x);
-            self.cmd(0x2a, &col_addresses_bits)?;
+            self.cmd(0x2a, col_addresses_bits.into_iter())?;
 
             // set row addresses (RASET)
             let row_addresses_bits =
                 get_coords_bytes(rect.top_left.y, rect.bottom_right().unwrap().y);
-            self.cmd(0x2b, &row_addresses_bits)?;
+            self.cmd(0x2b, row_addresses_bits.into_iter())?;
         }
         // then we write the pixel data (RAMWR).
-        self.cmd(0x2C, &[])?;
-        for byte in raw_data {
-            self.spi.write(&[byte]).map_err(DisplayError::SpiError)?;
-        }
+        self.cmd(0x2C, raw_data)?;
+        
         Ok(())
     }
 
@@ -312,7 +326,7 @@ where
 impl<Spi, EnPin, RstPin, PixColor> DrawTarget for Icna3311<Spi, EnPin, RstPin, PixColor>
 where
     PixColor: Icna3311PixelColor,
-    Spi: HalfDuplexSpiDevice,
+    Spi: ModalHalfDuplexSpiDevice,
     EnPin: OutputPin,
     RstPin: OutputPin,
 {
@@ -332,7 +346,7 @@ where
                     top_left: p.0,
                     size: Size::new_equal(1),
                 },
-                core::iter::once(p.1),
+                iter::once(p.1),
             )?;
         }
         Ok(())
@@ -349,9 +363,9 @@ where
 impl<Spi, EnPin, RstPin, PixColor> Dimensions for Icna3311<Spi, EnPin, RstPin, PixColor>
 where
     PixColor: Icna3311PixelColor,
-    Spi: HalfDuplexSpiDevice,
-    EnPin: OutputPin,
-    RstPin: OutputPin,
+    Spi     : ModalHalfDuplexSpiDevice<u8>,
+    EnPin   : OutputPin,
+    RstPin  : OutputPin,
 {
     fn bounding_box(&self) -> Rectangle {
         Rectangle::new(Point::zero(), Size::new(WIDTH as u32, HEIGHT as u32))

@@ -18,10 +18,11 @@ fixed = "1.28.0"
 nalgebra = { version = "0.33.2", default-features = false }
 pipe = { git = "https://github.com/artpeixoto/pipe", rev = "f0178a7e"}
 esp-hal = { version = "0.22.0", features = ["esp32s3"] }
-esp-backtrace = {version = "0.14.2", features = ["esp32s3", "println"]}
+esp-backtrace = {version = "0.14.2", features = ["esp32s3", "println", "panic-handler"]}
 esp-println = {version = "0.12.0", features = ["esp32s3"]}
 fugit = "0.3.7"
 embedded-hal-bus = "0.2.0"
+ufmt = "0.2.0"
 # log = { version = "0.4.22" }
 
 # [profile.dev]

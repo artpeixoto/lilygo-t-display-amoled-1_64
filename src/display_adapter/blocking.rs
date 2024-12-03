@@ -1,7 +1,7 @@
 use embedded_hal::{
     delay::DelayNs as BDelayNs,
     digital::OutputPin,
-    spi::{ErrorType, Operation, SpiBus, SpiDevice},
+    spi::{Operation, SpiBus, SpiDevice},
 };
 use embedded_hal_bus::spi::{DeviceError, ExclusiveDevice};
 use esp_hal::{
@@ -11,91 +11,101 @@ use esp_hal::{
     },
     Blocking,
 };
-use icna3311::MultiModeSpiDevice;
+use icna3311::{ErrorType, HalfDuplexSpiMode, ModalHalfDuplexSpiDevice, ModalHalfDuplexSpiDeviceTransaction};
 
+pub struct ModalHalfDuplexEspSpi<'d, ExecMode, SpiInst, CsPin, Delay> {
+    pub spi		: Spi<'d, ExecMode, SpiInst>,
+    pub cs_pin	: CsPin,
+    pub delay	: Delay,
+}
 
-pub struct MultimodeEspSpi<'d, ExecMode, SpiInst, CsPin, Delay> {
- 	spi		: Spi<'d, ExecMode, SpiInst>,
-	cs_pin	: CsPin,
-	delay 	: Delay
+impl<'d, ExecMode, SpiInst, CsPin, Delay> ModalHalfDuplexEspSpi<'d, ExecMode, SpiInst, CsPin, Delay> {
+	pub fn new(spi: Spi<'d, ExecMode, SpiInst>, cs_pin: CsPin, delay: Delay) -> Self {
+		Self { spi, cs_pin, delay }
+	}
 }
 
 impl<'d, SpiInst, CsPin, Delay> 
-	ErrorType for MultimodeEspSpi<'d, Blocking, SpiInst, CsPin, Delay>
-	where SpiInst: SpiMasterInstance, CsPin: OutputPin 
+	ModalHalfDuplexSpiDevice for ModalHalfDuplexEspSpi<'d, Blocking, SpiInst, CsPin, Delay> 
+where
+    SpiInst	: SpiMasterInstance,
+    CsPin	: OutputPin,
+    Delay	: BDelayNs,
 {
-    type Error = <Spi<'d, Blocking, SpiInst> as ErrorType>::Error;
+	type Transaction<'a> = ModalHalfDuplexEspSpiTransaction<'a, 'd, SpiInst, CsPin, Delay> where Self: 'a;
+	
+	fn start_transaction<'a>(&'a mut self) -> Result<Self::Transaction<'a>, Self::Error> {
+		self.cs_pin.set_low().unwrap();
+		Ok( ModalHalfDuplexEspSpiTransaction{
+			inner: self
+		})
+	}
 }
 
-impl<'d, SpiInst, CsPin, Delay> 
-	SpiDevice for MultimodeOwnedEspSpi<'d, Blocking, SpiInst, CsPin, Delay>
-	where SpiInst: SpiMasterInstance, CsPin: OutputPin, Delay: BDelayNs 
+pub struct ModalHalfDuplexEspSpiTransaction<'t,'d,  SpiInst, CsPin, Delay> 
+where
+    SpiInst	: SpiMasterInstance,
+    CsPin	: OutputPin,
+    Delay	: BDelayNs,
 {
-    fn transaction(&mut self, operations: &mut [Operation<'_, u8>]) -> Result<(), Self::Error> {
-		self.cs_pin.set_low();
-		for op in operations.iter_mut(){
-			match op{
-				Operation::Transfer(read_buf, write_buf) => {
+    inner: &'t mut ModalHalfDuplexEspSpi<'d, Blocking, SpiInst, CsPin, Delay>,
+}
 
-				}
-				Operation::Read(read_buf) 				=> {
-					self.spi.read(words)	
-				},
-				Operation::Write(_) 			=> todo!(),
-				Operation::TransferInPlace(_) 	=> todo!(),
-				Operation::DelayNs(_) => todo!(),	
-			}
-		}
-		self.cs_pin.set_high();
+impl<'d, 't, SpiInst, CsPin, Delay>
+    ModalHalfDuplexEspSpiTransaction<'t,'d,  SpiInst, CsPin, Delay>
+where
+    SpiInst	: SpiMasterInstance,
+    CsPin	: OutputPin,
+    Delay	: BDelayNs,
+{
+    fn get_esp_hal_mode(mode: HalfDuplexSpiMode) -> esp_hal::spi::SpiDataMode {
+        match mode {
+            HalfDuplexSpiMode::Simple => SpiDataMode::Single,
+            HalfDuplexSpiMode::Dual => SpiDataMode::Dual,
+            HalfDuplexSpiMode::Quad => SpiDataMode::Quad,
+        }
+    }
+}
+
+impl<'d, 't, SpiInst, CsPin, Delay> 
+ModalHalfDuplexSpiDeviceTransaction<u8> for ModalHalfDuplexEspSpiTransaction<'t, 'd,  SpiInst, CsPin, Delay>
+where
+    SpiInst: SpiMasterInstance,
+    CsPin: OutputPin,
+    Delay: BDelayNs,
+{
+    type Error = <ModalHalfDuplexEspSpi<'d, Blocking, SpiInst, CsPin, Delay> as ErrorType>::Error;
+
+    fn write(&mut self, buf: &[u8], mode: HalfDuplexSpiMode) -> Result<(), <ModalHalfDuplexEspSpi<'d, Blocking, SpiInst, CsPin, Delay> as ErrorType>::Error> {
+		let mode = Self::get_esp_hal_mode(mode);
+		self.inner.spi.half_duplex_write(mode, Command::None, Address::None, 0, buf)?;
+		Ok(())
+    }
+
+    fn read(&mut self, buf: &mut [u8], mode: HalfDuplexSpiMode) -> Result<(), <ModalHalfDuplexEspSpi<'d, Blocking, SpiInst, CsPin, Delay> as ErrorType>::Error> {
+		let mode = Self::get_esp_hal_mode(mode);
+		self.inner.spi.half_duplex_read(mode, Command::None, Address::None, 0, buf)?;
 		Ok(())
     }
 }
 
-impl<'d, SpiInst, CsPin, Delay> 
-	MultiModeSpiDevice for MultimodeOwnedEspSpi<'d, Blocking, SpiInst, CsPin, Delay>
-	where 
-		SpiInst	: SpiMasterInstance, 
-		CsPin: OutputPin, 
-		Delay: BDelayNs,
+impl<'d, 't, SpiInst, CsPin, Delay> 
+Drop for ModalHalfDuplexEspSpiTransaction<'t, 'd,  SpiInst, CsPin, Delay>
+where
+    SpiInst	: SpiMasterInstance,
+    CsPin	: OutputPin,
+    Delay	: BDelayNs,
 {
-	fn transaction_with_mode(
-		&mut self, 
-		operations: &mut [(Operation<'_, u8>, icna3311::SpiMode)]
-	) -> Result<(), Self::Error> {
-		self.cs_pin.set_low();
-		for (op, mode) in operations{
-			let mode = match mode {
-				icna3311::SpiMode::Simple 	=> SpiDataMode::Single,
-				icna3311::SpiMode::Dual 	=> SpiDataMode::Dual,
-				icna3311::SpiMode::Quad 	=> SpiDataMode::Quad,
-			};			
-			
-		};
+    fn drop(&mut self) {
+        self.inner.cs_pin.set_high().unwrap();
+    }
+}
 
-		Ok(())
-	}
-	
-		// fn write_mode(&mut self, mode: &icna3311::SpiMode, data: &[u8]) -> Result<(), Self::Error> {
-			// let mode = match mode {
-			// 	icna3311::SpiMode::Simple 	=> SpiDataMode::Single,
-			// 	icna3311::SpiMode::Dual 	=> SpiDataMode::Dual,
-			// 	icna3311::SpiMode::Quad 	=> SpiDataMode::Quad,
-			// };
-		// 	self.spi.bus_mut().half_duplex_write(mode, Command::None, Address::None, 0, data).map_err(|e| DeviceError::Spi(e))?;
-		// 	Ok(())
-		// }
-
-		// fn read_mode(&mut self, mode: &icna3311::SpiMode, buf: &mut [u8]) -> Result<(), Self::Error> {
-		// 	let mode = match mode {
-		// 		icna3311::SpiMode::Simple 	=> SpiDataMode::Single,
-		// 		icna3311::SpiMode::Dual 	=> SpiDataMode::Dual,
-		// 		icna3311::SpiMode::Quad 	=> SpiDataMode::Quad,
-		// 	};
-			
-		// 	self.spi
-		// 		.bus_mut()
-		// 		.half_duplex_read(mode, Command::None, Address::None, 0, buf)
-		// 		.map_err(|e| DeviceError::Spi(e))?;
-		// 	Ok(())   
-		// }
+impl<'d, SpiInst, CsPin, Delay> 
+ErrorType for ModalHalfDuplexEspSpi<'d, Blocking, SpiInst, CsPin, Delay>
+where
+    SpiInst: SpiMasterInstance,
+    CsPin: OutputPin,
+{
+    type Error = <Spi<'d, Blocking, SpiInst> as embedded_hal::spi::ErrorType>::Error;
 }

@@ -23,9 +23,9 @@ pub enum WorkMode{
 
 impl<I2cT, IntPin, TimeGetter> Ft3168<I2cT, IntPin, TimeGetter>
 {
-	pub fn new(i2c: I2cT, int_pin: IntPin, i2c_addr: SevenBitAddress, last_touch_read_instant: Option<Instant<u32, 1, 1_000>>, time_getter: TimeGetter) -> Self {
-			Self { i2c, int_pin, i2c_addr, last_touch_read_instant, time_getter }
-		}
+	pub fn new(i2c: I2cT, int_pin: IntPin, i2c_addr: SevenBitAddress, time_getter: TimeGetter) -> Self {
+		Self { i2c, int_pin, i2c_addr, last_touch_read_instant: None, time_getter }
+	}
 }
 impl<I2cT, IntPin, TimeGetter> Ft3168<I2cT, IntPin, TimeGetter>
 where 
@@ -33,8 +33,6 @@ where
 	IntPin		: InputPin,
 	TimeGetter	: FnMut() -> Instant<u32, 1,1_000>  
 {
-
-	
 	fn write_const_len<const LEN: usize>(&mut self, addr: u8, data: impl Iterator<Item=u8>) -> Result<(), Ft3168Error<I2cT::Error>>{
 		let data = {
 			let mut data_buf: [u8; LEN] = [0;LEN];
