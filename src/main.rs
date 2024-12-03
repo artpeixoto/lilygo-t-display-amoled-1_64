@@ -30,12 +30,7 @@ fn main() -> ! {
     #[allow(unused)]
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let delay = Delay::new();
-    let io = Io::new(peripherals.IO_MUX);
 
-    let dma = Dma::new(peripherals.DMA);
-    let spi_dma = dma
-        .channel0
-        .configure(true, esp_hal::dma::DmaPriority::Priority4);
     let spi = Spi::new(peripherals.SPI2)
         .with_mosi(Flex::new(peripherals.GPIO11))
         .with_miso(Flex::new(peripherals.GPIO13))
@@ -59,7 +54,7 @@ fn main() -> ! {
         .unwrap();
 
     display.enable();
-    display.fill_solid(&display.bounding_box(), RgbColor::WHITE);
+    display.fill_solid(&display.bounding_box(), RgbColor::WHITE).map_err(|e| panic!("error ")).unwrap();
 
     let touch_i2c = 
 		I2c::new(
@@ -92,7 +87,7 @@ fn main() -> ! {
 				.build(),
 		)
 		.draw(&mut display)
-		.map_err(|e| panic!())
+		.map_err(|e| panic!("Error writing hello text"))
 		.unwrap();
 
 	display.fill_solid(&Rectangle::with_center(Point::new(110, 228), Size::new_equal(30)), Rgb888::RED).map_err(|x| panic!()).unwrap();
@@ -113,7 +108,7 @@ fn main() -> ! {
 				.build(),
 		)
 		.draw(&mut display)
-		.map_err(|e| panic!())
+		.map_err(|e| panic!("Error writing text"))
 		.unwrap();
 
     loop {
@@ -128,7 +123,7 @@ fn main() -> ! {
 					.build()
 			)
 			.draw(&mut display)
-			.map_err(|e| panic!())
+			.map_err(|e| panic!("Error informing of touches"))
 			.unwrap();
 
 
